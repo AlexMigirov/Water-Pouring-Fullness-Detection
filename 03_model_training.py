@@ -7,9 +7,8 @@ if hasattr(sys.stdout, 'reconfigure'):
 ====================
 Step 3 of the Water-Level Detection ML Pipeline.
 
-Two classification tasks:
-  Task A  --  Binary  : Is_Full  (is the cup full right now?)
-  Task B  --  4-class : Cup_Type (which type of cup is it?)
+Classification task:
+  Binary: Is_Full  (is the cup full right now?)
 
 Models:
   1. Gradient Boosting  (GradientBoostingClassifier)
@@ -20,22 +19,17 @@ Cross-validation:
   GroupKFold(n_splits=5), grouped by Recording_Num
   => 12 recordings per fold, zero leakage between windows of the same recording
 
-Class imbalance (Task A only, 97/3 split):
+Class imbalance (97/3 split):
   - Logistic Regression / Random Forest: class_weight='balanced'
   - Gradient Boosting: sample_weight computed per fold via compute_sample_weight
 
 Outputs (outputs/figures/ and outputs/tables/):
-  Task A:
     roc_curves_fullness.png
     pr_curves_fullness.png
+    feature_importance.png
+    metrics_comparison_fullness.png
     cv_results_fullness.csv
     fold_metrics_fullness.csv
-  Task B:
-    roc_curves_cup_type.png   (one-vs-rest AUC per class)
-    cv_results_cup_type.csv
-    fold_metrics_cup_type.csv
-  Shared:
-    feature_importance.png
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -54,7 +48,7 @@ from pathlib import Path
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GroupKFold
-from sklearn.preprocessing import StandardScaler, label_binarize
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     roc_auc_score, average_precision_score,
@@ -87,7 +81,6 @@ MODEL_COLORS = {
     "Logistic Regression": "#457B9D",
     "Random Forest":       "#2A9D8F",
 }
-CUP_LABEL_MAP = {1: "Thick_Glass", 2: "Tall_Thin_Glass", 3: "Ceramic_Cup", 4: "Plastic_Cup"}
 
 plt.rcParams.update({
     "figure.dpi":       150,
@@ -118,12 +111,10 @@ print(f"\nLoaded: {len(df):,} rows, {len(FEATURE_COLS)} features")
 
 X      = df[FEATURE_COLS].values.astype(np.float64)
 y_full = df["Is_Full"].values.astype(int)
-y_cup  = df["Cup_Label"].values.astype(int)
 groups = df["Group_KFold"].values.astype(int)
 
 print(f"Groups (recordings): {np.unique(groups).size}")
 print(f"Is_Full positives  : {y_full.sum():,} / {len(y_full):,}  ({y_full.mean()*100:.2f}%)")
-print(f"Cup labels         : {np.unique(y_cup)}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. Model definitions
@@ -145,22 +136,6 @@ def get_models_binary():
         ),
     }
 
-def get_models_multiclass():
-    """Return dict of models tuned for 4-class cup type classification."""
-    return {
-        "Gradient Boosting": GradientBoostingClassifier(
-            n_estimators=200, max_depth=5, learning_rate=0.08,
-            subsample=0.8, min_samples_leaf=5, random_state=RANDOM_STATE,
-        ),
-        "Logistic Regression": LogisticRegression(
-            C=1.0, max_iter=2000, solver="lbfgs",
-            class_weight="balanced", random_state=RANDOM_STATE,
-        ),
-        "Random Forest": RandomForestClassifier(
-            n_estimators=200, max_depth=12, min_samples_leaf=3,
-            class_weight="balanced", random_state=RANDOM_STATE, n_jobs=-1,
-        ),
-    }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. Task A — Binary: Is_Full
@@ -258,7 +233,7 @@ summary_a = summary_a.reset_index()
 summary_a.to_csv(OUT_TABLES / "cv_results_fullness.csv", index=False, encoding="utf-8-sig")
 print(f"  [OK] Saved -> outputs/tables/cv_results_fullness.csv")
 
-print("\n  ---- Task A Summary (Mean across 5 folds) ----")
+print("\n  ---- Summary (Mean across 5 folds) ----")
 for _, row in summary_a.iterrows():
     print(f"  {row['Model']:<22}  "
           f"Acc={row['Accuracy_mean']:.3f}+/-{row['Accuracy_std']:.3f}  "
@@ -266,97 +241,7 @@ for _, row in summary_a.iterrows():
           f"AUC={row['AUC-ROC_mean']:.3f}+/-{row['AUC-ROC_std']:.3f}")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. Task B — 4-class: Cup Type
-# ─────────────────────────────────────────────────────────────────────────────
-print("\n" + "-"*65)
-print("  TASK B: Cup Type Classification (4-class)  [GroupKFold K=5]")
-print("-"*65)
-
-classes = np.array([1, 2, 3, 4])
-class_names = [CUP_LABEL_MAP[c] for c in classes]
-
-models_b = get_models_multiclass()
-fold_records_b = []
-roc_data_b = {m: {c: {"fprs":[], "tprs":[], "aucs":[]} for c in class_names} for m in models_b}
-
-for fold_idx, (train_idx, test_idx) in enumerate(gkf.split(X, y_cup, groups), start=1):
-    X_tr, X_te = X[train_idx], X[test_idx]
-    y_tr, y_te = y_cup[train_idx], y_cup[test_idx]
-
-    scaler = StandardScaler()
-    X_tr_s = scaler.fit_transform(X_tr)
-    X_te_s = scaler.transform(X_te)
-
-    sw_tr = compute_sample_weight("balanced", y_tr)
-
-    print(f"\n  Fold {fold_idx}  |  train: {len(y_tr):,}  |  test: {len(y_te):,}")
-
-    for model_name, clf in models_b.items():
-        if model_name == "Gradient Boosting":
-            clf.fit(X_tr_s, y_tr, sample_weight=sw_tr)
-        else:
-            clf.fit(X_tr_s, y_tr)
-
-        y_pred = clf.predict(X_te_s)
-        y_prob = clf.predict_proba(X_te_s)  # shape (n, 4)
-
-        acc    = accuracy_score(y_te, y_pred)
-        f1_mac = f1_score(y_te, y_pred, average="macro",  zero_division=0)
-        f1_wt  = f1_score(y_te, y_pred, average="weighted", zero_division=0)
-
-        # Per-class F1
-        f1_per = f1_score(y_te, y_pred, average=None, labels=classes, zero_division=0)
-
-        # OvR AUC
-        y_te_bin = label_binarize(y_te, classes=classes)
-        try:
-            auc_ovr = roc_auc_score(y_te_bin, y_prob, average="macro", multi_class="ovr")
-        except Exception:
-            auc_ovr = np.nan
-
-        rec = {
-            "Fold": fold_idx, "Model": model_name,
-            "Accuracy": round(acc, 4),
-            "F1-Macro": round(f1_mac, 4),
-            "F1-Weighted": round(f1_wt, 4),
-            "AUC-ROC-Macro": round(auc_ovr, 4) if not np.isnan(auc_ovr) else np.nan,
-        }
-        for i, cname in enumerate(class_names):
-            rec[f"F1_{cname}"] = round(f1_per[i], 4)
-        fold_records_b.append(rec)
-
-        # Per-class ROC curves
-        for i, cname in enumerate(class_names):
-            if y_te_bin[:, i].sum() > 0:
-                fpr, tpr, _ = roc_curve(y_te_bin[:, i], y_prob[:, i])
-                roc_data_b[model_name][cname]["fprs"].append(fpr)
-                roc_data_b[model_name][cname]["tprs"].append(tpr)
-                roc_data_b[model_name][cname]["aucs"].append(
-                    roc_auc_score(y_te_bin[:, i], y_prob[:, i])
-                )
-
-        print(f"    {model_name:<22}  Acc={acc:.3f}  F1-Mac={f1_mac:.3f}  AUC={auc_ovr:.3f}")
-
-df_folds_b = pd.DataFrame(fold_records_b)
-df_folds_b.to_csv(OUT_TABLES / "fold_metrics_cup_type.csv", index=False, encoding="utf-8-sig")
-print(f"\n  [OK] Saved -> outputs/tables/fold_metrics_cup_type.csv")
-
-metric_cols_b = ["Accuracy","F1-Macro","F1-Weighted","AUC-ROC-Macro"] + [f"F1_{c}" for c in class_names]
-summary_b = df_folds_b.groupby("Model")[metric_cols_b].agg(["mean","std"]).round(4)
-summary_b.columns = [f"{col}_{stat}" for col, stat in summary_b.columns]
-summary_b = summary_b.reset_index()
-summary_b.to_csv(OUT_TABLES / "cv_results_cup_type.csv", index=False, encoding="utf-8-sig")
-print(f"  [OK] Saved -> outputs/tables/cv_results_cup_type.csv")
-
-print("\n  ---- Task B Summary (Mean across 5 folds) ----")
-for _, row in summary_b.iterrows():
-    print(f"  {row['Model']:<22}  "
-          f"Acc={row['Accuracy_mean']:.3f}+/-{row['Accuracy_std']:.3f}  "
-          f"F1-Mac={row['F1-Macro_mean']:.3f}+/-{row['F1-Macro_std']:.3f}  "
-          f"AUC={row['AUC-ROC-Macro_mean']:.3f}+/-{row['AUC-ROC-Macro_std']:.3f}")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 5. FIGURES — Task A: ROC + PR curves
+# 4. FIGURES — ROC + PR curves
 # ─────────────────────────────────────────────────────────────────────────────
 print("\n" + "-"*65)
 print("  Generating figures...")
@@ -577,25 +462,15 @@ print("\n" + "="*65)
 print("  FINAL SUMMARY")
 print("="*65)
 
-print("\n  Task A -- Fullness Detection (Is_Full):")
+print("\n  Fullness Detection (Is_Full):")
 for _, row in summary_a.sort_values("F1-Score_mean", ascending=False).iterrows():
     print(f"    {row['Model']:<22}  F1={row['F1-Score_mean']:.3f}  "
           f"AUC={row['AUC-ROC_mean']:.3f}  "
           f"Recall={row['Recall_mean']:.3f}")
 
-print("\n  Task B -- Cup Type Classification:")
-for _, row in summary_b.sort_values("F1-Macro_mean", ascending=False).iterrows():
-    print(f"    {row['Model']:<22}  F1-Macro={row['F1-Macro_mean']:.3f}  "
-          f"AUC={row['AUC-ROC-Macro_mean']:.3f}  "
-          f"Acc={row['Accuracy_mean']:.3f}")
-
 print("\n  Outputs saved:")
 print("    outputs/tables/  ->  fold_metrics_fullness.csv, cv_results_fullness.csv")
-print("                         fold_metrics_cup_type.csv, cv_results_cup_type.csv")
 print("    outputs/figures/ ->  roc_curves_fullness.png, pr_curves_fullness.png")
-print("                         roc_curves_cup_type.png, feature_importance.png")
-print("                         metrics_comparison_fullness.png")
-print("                         metrics_comparison_cup_type.png")
-print("                         f1_heatmap_cup_type.png")
+print("                         feature_importance.png, metrics_comparison_fullness.png")
 print("\n  Step 3 COMPLETE - Next: run  python 04_evaluation_and_report.py")
 print("="*65 + "\n")

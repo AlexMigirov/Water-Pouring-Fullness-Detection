@@ -123,17 +123,12 @@ python 03_model_training.py
 ```
 | Output | Description |
 |---|---|
-| `outputs/figures/roc_curves_fullness.png` | ROC curves (Task A, mean ± std over 5 folds) |
-| `outputs/figures/pr_curves_fullness.png` | Precision-Recall curves (Task A) |
-| `outputs/figures/roc_curves_cup_type.png` | One-vs-Rest ROC per cup class (Task B) |
-| `outputs/figures/feature_importance.png` | Top-15 features for all 3 models (Task A) |
-| `outputs/figures/metrics_comparison_fullness.png` | Bar chart comparison (Task A) |
-| `outputs/figures/metrics_comparison_cup_type.png` | Bar chart comparison (Task B) |
-| `outputs/figures/f1_heatmap_cup_type.png` | Per-class F1 heatmap (Task B) |
-| `outputs/tables/fold_metrics_fullness.csv` | Raw per-fold scores (Task A) |
-| `outputs/tables/cv_results_fullness.csv` | Mean ± std per model (Task A) |
-| `outputs/tables/fold_metrics_cup_type.csv` | Raw per-fold scores (Task B) |
-| `outputs/tables/cv_results_cup_type.csv` | Mean ± std per model (Task B) |
+| `outputs/figures/roc_curves_fullness.png` | ROC curves (mean ± std over 5 folds) |
+| `outputs/figures/pr_curves_fullness.png` | Precision-Recall curves |
+| `outputs/figures/feature_importance.png` | Top-15 features for all 3 models |
+| `outputs/figures/metrics_comparison_fullness.png` | Bar chart comparison |
+| `outputs/tables/fold_metrics_fullness.csv` | Raw per-fold scores |
+| `outputs/tables/cv_results_fullness.csv` | Mean ± std per model |
 
 ### Step 4 — Final Evaluation & Report Figures
 ```bash
@@ -141,34 +136,22 @@ python 04_evaluation_and_report.py
 ```
 | Output | Description |
 |---|---|
-| `outputs/figures/confusion_matrix_fullness.png` | Confusion matrices — all 3 models (Task A) |
-| `outputs/figures/confusion_matrix_cup_type.png` | Confusion matrices — all 3 models (Task B) |
-| `outputs/figures/fold_variability_fullness.png` | Per-fold metric stability (Task A) |
-| `outputs/figures/fold_variability_cup_type.png` | Per-fold metric stability (Task B) |
-| `outputs/figures/per_recording_accuracy.png` | Per-recording accuracy heatmap (best model) |
-| `outputs/figures/performance_dashboard.png` | 6-panel combined dashboard |
+| `outputs/figures/confusion_matrix_fullness.png` | Confusion matrices — all 3 models |
+| `outputs/figures/fold_variability_fullness.png` | Per-fold metric stability |
+| `outputs/figures/performance_dashboard.png` | 3-panel combined dashboard |
 | `outputs/tables/final_summary_table.csv` | **Master Word-ready summary table** |
-| `outputs/tables/per_recording_accuracy.csv` | Per-recording accuracy (Gradient Boosting) |
 
 ---
 
 ## 📊 Key Results
 
-### Task A — Fullness Detection (`Is_Full`, binary)
+### Fullness Detection (`Is_Full`, binary)
 
 | Model | Accuracy | F1-Score | AUC-ROC | Recall |
 |---|---|---|---|---|
 | **Gradient Boosting** 🥇 | 0.956 ± 0.010 | **0.417 ± 0.053** | **0.913 ± 0.030** | 0.528 |
 | Random Forest | 0.946 ± 0.009 | 0.350 ± 0.049 | 0.910 ± 0.036 | 0.496 |
-| Logistic Regression | 0.838 ± 0.030 | 0.234 ± 0.026 | 0.900 ± 0.035 | 0.828 |
-
-### Task B — Cup Type Classification (4-class)
-
-| Model | Accuracy | F1-Macro | AUC-ROC |
-|---|---|---|---|
-| **Gradient Boosting** 🥇 | **0.881 ± 0.024** | **0.872 ± 0.025** | **0.980 ± 0.006** |
-| Random Forest | 0.854 ± 0.033 | 0.845 ± 0.033 | 0.971 ± 0.009 |
-| Logistic Regression | 0.803 ± 0.026 | 0.796 ± 0.031 | 0.946 ± 0.012 |
+| Logistic Regression | 0.838 ± 0.030 | 0.234 ± 0.026 | 0.900 ± 0.035 | **0.828** |
 
 > All results use **GroupKFold (K=5)** grouped by recording — no data leakage between windows of the same recording.
 

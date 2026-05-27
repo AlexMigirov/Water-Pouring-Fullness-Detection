@@ -313,36 +313,24 @@ df_clean = df_raw.dropna(subset=FEATURE_COLS).copy()
 n_after  = len(df_clean)
 print(f"Dropped {n_before - n_after} rows with NaN features.  Remaining: {n_after:,}")
 
-# ── 5b. Encode Cup_Type as integer class label ────────────────────────────
-CUP_LABEL = {
-    "Thick_Glass":     1,
-    "Tall_Thin_Glass": 2,
-    "Ceramic_Cup":     3,
-    "Plastic_Cup":     4,
-}
-df_clean["Cup_Label"] = df_clean["Cup_Type"].map(CUP_LABEL)
-print(f"\nCup_Type → Cup_Label mapping:\n{CUP_LABEL}")
-
-# ── 5c. Create a clean Group-ID for GroupKFold ────────────────────────────
+# ── 5b. Create a clean Group-ID for GroupKFold ────────────────────────────
 #    Each recording = one group (60 groups, 5 folds → 12 recordings per fold)
 df_clean["Group_KFold"] = df_clean["Recording_Num"].astype(int)
 print(f"\nUnique GroupKFold groups (recordings): {df_clean['Group_KFold'].nunique()}")
 
-# ── 5d. Feature matrix & target vectors ───────────────────────────────────
-X = df_clean[FEATURE_COLS].values.astype(np.float64)
-y_fullness  = df_clean["Is_Full"].values.astype(int)      # binary fullness
-y_cup       = df_clean["Cup_Label"].values.astype(int)    # cup type classification
-groups      = df_clean["Group_KFold"].values               # GroupKFold splitter
+# ── 5c. Feature matrix & target vector ────────────────────────────────────
+X          = df_clean[FEATURE_COLS].values.astype(np.float64)
+y_fullness = df_clean["Is_Full"].values.astype(int)   # binary target
+groups     = df_clean["Group_KFold"].values             # GroupKFold splitter
 
 print(f"\nFeature matrix X : {X.shape}")
 print(f"Target y_fullness: {y_fullness.shape}  (Is_Full – binary)")
-print(f"Target y_cup     : {y_cup.shape}        (Cup type – 4-class)")
 print(f"Groups           : {groups.shape}  ({np.unique(groups).size} unique recordings)")
 
-# ── 5e. Save preprocessed dataset as CSV ─────────────────────────────────
+# ── 5d. Save preprocessed dataset as CSV ─────────────────────────────────
 df_out = df_clean[
     ["Recording_ID", "Recording_Num", "Group_KFold",
-     "Cup_Type", "Cup_Label", "Window_Num",
+     "Cup_Type", "Window_Num",
      "Start_Time_s", "End_Time_s", "Is_Full"]
     + FEATURE_COLS
 ].copy()
@@ -359,10 +347,10 @@ print(f"  Feature columns        : {len(FEATURE_COLS)}")
 print(f"  Unique recordings      : {df_clean['Recording_Num'].nunique()}")
 print(f"  Is_Full = 1  (positive): {(y_fullness == 1).sum():,}  ({(y_fullness==1).mean()*100:.2f}%)")
 print(f"  Is_Full = 0  (negative): {(y_fullness == 0).sum():,}  ({(y_fullness==0).mean()*100:.2f}%)")
-print(f"\n  Cup breakdown:")
-for cup, label in CUP_LABEL.items():
-    n = (y_cup == label).sum()
-    print(f"    {cup:<20} (class {label}): {n:>5,} windows")
+print(f"\n  Cup type window counts:")
+for cup in ["Thick_Glass","Tall_Thin_Glass","Ceramic_Cup","Plastic_Cup"]:
+    n = (df_clean["Cup_Type"] == cup).sum()
+    print(f"    {cup:<20}: {n:>5,} windows")
 
 print("\n" + "="*65)
 print("  Step 1 COMPLETE - outputs saved to outputs/")
