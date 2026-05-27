@@ -21,14 +21,14 @@ Machine Learning Project/
 ├── Spectrogram_Code.txt              # Original spectrogram + MFCC extraction reference
 ├── Project Instructions.pdf          # Full project specification
 │
-├── 01_explore_and_preprocess.py  ✅  # EDA + preprocessing → 6 figures + 2 CSVs
-├── 02_spectrogram_analysis.py    ✅  # Mel-spectrogram + frequency-tracker → 4 figures
-├── 03_model_training.py          ✅  # Group K-Fold CV (K=5), 3 models, 2 tasks → 7 figures + 4 CSVs
-├── 04_evaluation_and_report.py   ✅  # Confusion matrices, dashboard, final table → 7 figures + 2 CSVs
+├── Codes/
+│   ├── 01_explore_and_preprocess.py  ✅  # EDA + preprocessing → 6 figures + 2 CSVs
+│   ├── 02_spectrogram_analysis.py    ✅  # Mel-spectrogram + frequency-tracker → 4 figures
+│   ├── 03_model_training.py          ✅  # Group K-Fold CV (K=5), 3 models → 4 figures + 2 CSVs
+│   └── 04_evaluation_and_report.py   ✅  # Confusion matrices, dashboard, final table → 3 figures + 1 CSV
 │
-├── outputs/
-│   ├── figures/                      # 23 publication-quality PNG figures (300 DPI)
-│   └── tables/                       # 8 CSV tables (UTF-8, Word-ready)
+├── figures/                          # 17 publication-quality PNG figures (300 DPI)
+├── tables/                           # 4 CSV tables (UTF-8, Word-ready)
 │
 └── README.md                         # This file
 ```
@@ -93,53 +93,53 @@ Run the scripts **in order** from the project root directory:
 
 ### Step 1 — Data Exploration & Preprocessing
 ```bash
-python 01_explore_and_preprocess.py
+python Codes/01_explore_and_preprocess.py
 ```
 | Output | Description |
 |---|---|
-| `outputs/figures/class_distribution.png` | Windows per cup class |
-| `outputs/figures/is_full_distribution.png` | Is_Full balance (overall + per class) |
-| `outputs/figures/windows_per_recording.png` | Recording length variability |
-| `outputs/figures/mfcc_raw_distributions.png` | MFCC violin plots by cup type |
-| `outputs/figures/mfcc_feature_boxplots.png` | Mean/Std/Delta boxplots by cup type |
-| `outputs/figures/correlation_heatmap.png` | 25×25 feature correlation matrix |
-| `outputs/tables/dataset_summary.csv` | Descriptive statistics (mean, std, quartiles) |
-| `outputs/tables/preprocessed_dataset.csv` | Clean feature matrix used by steps 3 & 4 |
+| `figures/class_distribution.png` | Windows per cup class |
+| `figures/is_full_distribution.png` | Is_Full balance (overall + per class) |
+| `figures/windows_per_recording.png` | Recording length variability |
+| `figures/mfcc_raw_distributions.png` | MFCC violin plots by cup type |
+| `figures/mfcc_feature_boxplots.png` | Mean/Std/Delta boxplots by cup type |
+| `figures/correlation_heatmap.png` | 25×25 feature correlation matrix |
+| `tables/dataset_summary.csv` | Descriptive statistics (mean, std, quartiles) |
+| `tables/preprocessed_dataset.csv` | Clean feature matrix used by steps 3 & 4 |
 
 ### Step 2 — Spectrogram & Frequency-Tracker Analysis
 ```bash
-python 02_spectrogram_analysis.py
+python Codes/02_spectrogram_analysis.py
 ```
 | Output | Description |
 |---|---|
-| `outputs/figures/Tracker_Thick_Glass.png` | Average mel-spectrogram + frequency tracker |
-| `outputs/figures/Tracker_Tall_Thin_Glass.png` | (same for Class 2) |
-| `outputs/figures/Tracker_Ceramic_Cup.png` | (same for Class 3) |
-| `outputs/figures/Tracker_Plastic_Cup.png` | (same for Class 4) |
+| `figures/Tracker_Thick_Glass.png` | Average mel-spectrogram + frequency tracker |
+| `figures/Tracker_Tall_Thin_Glass.png` | (same for Class 2) |
+| `figures/Tracker_Ceramic_Cup.png` | (same for Class 3) |
+| `figures/Tracker_Plastic_Cup.png` | (same for Class 4) |
 
 ### Step 3 — Model Training & Cross-Validation
 ```bash
-python 03_model_training.py
+python Codes/03_model_training.py
 ```
 | Output | Description |
 |---|---|
-| `outputs/figures/roc_curves_fullness.png` | ROC curves (mean ± std over 5 folds) |
-| `outputs/figures/pr_curves_fullness.png` | Precision-Recall curves |
-| `outputs/figures/feature_importance.png` | Top-15 features for all 3 models |
-| `outputs/figures/metrics_comparison_fullness.png` | Bar chart comparison |
-| `outputs/tables/fold_metrics_fullness.csv` | Raw per-fold scores |
-| `outputs/tables/cv_results_fullness.csv` | Mean ± std per model |
+| `figures/roc_curves_fullness.png` | ROC curves (mean ± std over 5 folds) |
+| `figures/pr_curves_fullness.png` | Precision-Recall curves |
+| `figures/feature_importance.png` | Top-15 features for all 3 models |
+| `figures/metrics_comparison_fullness.png` | Bar chart comparison |
+| `tables/fold_metrics_fullness.csv` | Raw per-fold scores |
+| `tables/cv_results_fullness.csv` | Mean ± std per model |
 
 ### Step 4 — Final Evaluation & Report Figures
 ```bash
-python 04_evaluation_and_report.py
+python Codes/04_evaluation_and_report.py
 ```
 | Output | Description |
 |---|---|
-| `outputs/figures/confusion_matrix_fullness.png` | Confusion matrices — all 3 models |
-| `outputs/figures/fold_variability_fullness.png` | Per-fold metric stability |
-| `outputs/figures/performance_dashboard.png` | 3-panel combined dashboard |
-| `outputs/tables/final_summary_table.csv` | **Master Word-ready summary table** |
+| `figures/confusion_matrix_fullness.png` | Confusion matrices — all 3 models |
+| `figures/fold_variability_fullness.png` | Per-fold metric stability |
+| `figures/performance_dashboard.png` | 3-panel combined dashboard |
+| `tables/final_summary_table.csv` | **Master Word-ready summary table** |
 
 ---
 
