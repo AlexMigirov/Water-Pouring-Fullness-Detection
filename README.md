@@ -172,4 +172,4 @@ python 04_evaluation_and_report.py
 
 ## 👥 Project Team
 
-Signal Processing & Machine Learning — Academic Project, 2025–2026
+Alex Migirov, Dor Ohana, Alex Deryunkin, Yarin Navon
