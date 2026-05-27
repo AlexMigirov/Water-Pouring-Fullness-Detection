@@ -1,0 +1,338 @@
+import matplotlib
+
+matplotlib.use('Agg')
+
+import os
+import librosa
+import librosa.display
+import matplotlib.pyplot as plt
+import numpy as np
+import av
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+import pandas as pd
+
+# =====================================================================
+# הגדרות מערך הנתונים - חלוקה ל-60 הקלטות עם סוגי הכוסות המעודכנים
+# =====================================================================
+group_rules = [
+    {"range": range(1, 16), "name": "Group_1_to_15", "type": "Thick_Glass", "heb_name": "כוס זכוכית עבה"},
+    {"range": range(16, 31), "name": "Group_16_to_30", "type": "Tall_Thin_Glass", "heb_name": "כוס זכוכית דקה ארוכה"},
+    {"range": range(31, 46), "name": "Group_31_to_45", "type": "Ceramic_Cup", "heb_name": "כוס חרסינה"},
+    {"range": range(46, 61), "name": "Group_46_to_60", "type": "Plastic_Cup", "heb_name": "כוס פלסטיק"}
+]
+
+# פרמטרים לחלונות ה-MFCC (100ms פסיעה)
+target_window_frames = 30  # גודל חלון: 30 פריימים (300ms)
+target_hop_frames = 10  # פסיעה: 10 פריימים (100ms)
+
+excel_dataset_rows = []
+sample_rate_global = None
+
+print("--- מתחיל תהליך עיבוד שמע משולב: גרפים + חילוץ מאפיינים לאקסל ---")
+print("--- מעבד סה\"כ 60 הקלטות ב-4 מחלקות מאוזנות ---")
+
+# =====================================================================
+# שלב 1: עיבוד קבצים, חילוץ MFCC ובניית ה-Dataset לאקסל ולגרפים
+# =====================================================================
+all_group_spectrograms = {g["name"]: [] for g in group_rules}
+max_frames_per_group = {g["name"]: 0 for g in group_rules}
+
+for g in group_rules:
+    for file_num in g["range"]:
+        mp4_file = f"{file_num}.mp4"
+        if not os.path.exists(mp4_file):
+            continue
+
+        print(f"-> קורא ומחלץ מאפיינים: {mp4_file} ({g['heb_name']})")
+        try:
+            container = av.open(mp4_file)
+            if not container.streams.audio:
+                container.close()
+                continue
+
+            audio_stream = container.streams.audio[0]
+            audio_data = []
+            for frame in container.decode(audio_stream):
+                array = frame.to_ndarray()
+                if array.ndim > 1:
+                    array = np.mean(array, axis=0)
+                audio_data.append(array)
+
+            y = np.concatenate(audio_data).astype(np.float32)
+            max_vol = np.max(np.abs(y))
+            if max_vol > 0:
+                y /= max_vol
+
+            sr = audio_stream.rate
+            if sample_rate_global is None:
+                sample_rate_global = sr
+
+            container.close()
+
+            # --- חישוב לגרפים ---
+            S = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=2048, hop_length=512)
+            S_dB = librosa.power_to_db(S, ref=np.max)
+            all_group_spectrograms[g["name"]].append(S_dB)
+            if S_dB.shape[1] > max_frames_per_group[g["name"]]:
+                max_frames_per_group[g["name"]] = S_dB.shape[1]
+
+            # --- חישוב לאקסל (MFCC) ---
+            hop_10ms = int(0.010 * sr)
+            n_fft_window = int(0.030 * sr)
+
+            raw_mfcc_all = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, n_fft=n_fft_window, hop_length=hop_10ms)
+            delta_mfcc_all = librosa.feature.delta(raw_mfcc_all)
+
+            total_frames = raw_mfcc_all.shape[1]
+            total_duration_sec = len(y) / sr
+
+            window_idx = 1
+            start_frame = 0
+
+            while start_frame + target_window_frames <= total_frames:
+                end_frame = start_frame + target_window_frames
+
+                t_start = start_frame * 0.010
+                t_end = end_frame * 0.010
+
+                # תיוג 1 רק בחצי השנייה האחרונה
+                is_full = 1 if t_end >= (total_duration_sec - 0.5) else 0
+
+                mid_frame = start_frame + (target_window_frames // 2)
+                raw_values = list(raw_mfcc_all[:, mid_frame])
+
+                window_segment_raw = raw_mfcc_all[:4, start_frame:end_frame]
+                window_segment_delta = delta_mfcc_all[:4, start_frame:end_frame]
+
+                means = list(np.mean(window_segment_raw, axis=1))
+                stds = list(np.std(window_segment_raw, axis=1))
+                deltas = list(np.mean(window_segment_delta, axis=1))
+
+                meta_cols = [f"הקלטה_{file_num:02d}", g["name"], g["type"], window_idx, round(t_start, 3),
+                             round(t_end, 3), is_full]
+                full_row = meta_cols + [round(v, 3) for v in (raw_values + means + stds + deltas)]
+                excel_dataset_rows.append(full_row)
+
+                window_idx += 1
+                start_frame += target_hop_frames
+
+        except Exception as e:
+            print(f"   [שגיאה בעיבוד קובץ {mp4_file}]: {e}")
+
+# =====================================================================
+# שלב 2: יצירת קובץ ה-Excel המאוחד והמעוצב
+# =====================================================================
+if excel_dataset_rows:
+    print("\n--- מייצר את קובץ האקסל המאוחד (100ms Overlap) ---")
+    wb = openpyxl.Workbook()
+
+    # --- גיליון סיכום והגדרות ---
+    ws_summary = wb.active
+    ws_summary.title = "סיכום והגדרות פרויקט"
+    ws_summary.views.sheetView[0].showGridLines = True
+    ws_summary.sheet_view.rightToLeft = True
+
+    header_font = Font(name='Segoe UI', size=11, bold=True, color='FFFFFF')
+    regular_font = Font(name='Segoe UI', size=11, color='333333')
+    header_fill = PatternFill(start_color='2C3E50', end_color='2C3E50', fill_type='solid')
+    zebra_fill = PatternFill(start_color='F8F9F9', end_color='F8F9F9', fill_type='solid')
+    full_fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'),
+                         bottom=Side(style='thin'))
+
+    ws_summary['A1'] = "מאגר נתונים מאוחד - 60 הקלטות (מאוזן)"
+    ws_summary['A1'].font = Font(name='Segoe UI', size=15, bold=True, color='1F3A52')
+
+    # טבלת סוגי כוסות בסיכום
+    ws_summary['A3'] = "קבוצה והקלטות"
+    ws_summary['B3'] = "מזהה באנגלית (Class)"
+    ws_summary['C3'] = "תיאור פיזיקלי (עברית)"
+
+    for col in ['A', 'B', 'C']:
+        cell = ws_summary[f'{col}3']
+        cell.font = header_font;
+        cell.fill = header_fill;
+        cell.alignment = Alignment(horizontal='center', vertical='center');
+        cell.border = thin_border
+
+    summary_data = [
+        ["קבוצה 1 (01-15)", "Thick_Glass", "כוס זכוכית עבה"],
+        ["קבוצה 2 (16-30)", "Tall_Thin_Glass", "כוס זכוכית דקה ארוכה"],
+        ["קבוצה 3 (31-45)", "Ceramic_Cup", "כוס חרסינה"],
+        ["קבוצה 4 (46-60)", "Plastic_Cup", "כוס פלסטיק"]
+    ]
+
+    for idx, row in enumerate(summary_data, start=4):
+        for col_idx, val in enumerate(row, start=1):
+            cell = ws_summary.cell(row=idx, column=col_idx, value=val)
+            cell.font = regular_font;
+            cell.border = thin_border;
+            cell.alignment = Alignment(horizontal='center')
+
+    # --- גיליון נתונים מאוחד ---
+    ws_data = wb.create_sheet(title="מאגר נתונים מאוחד")
+    ws_data.views.sheetView[0].showGridLines = True
+    ws_data.sheet_view.rightToLeft = True
+
+    headers = ["מזהה הקלטה", "קבוצה (Group)", "סוג כוס (Cup Type)", "מספר חלון", "זמן התחלה (s)", "זמן סיום (s)",
+               "תיוג - כוס מלאה (Is_Full)"]
+    for i in range(1, 14): headers.append(f"MFCC_{i}_Raw")
+    for i in range(1, 5): headers.append(f"MFCC_{i}_Mean")
+    for i in range(1, 5): headers.append(f"MFCC_{i}_Std")
+    for i in range(1, 5): headers.append(f"MFCC_{i}_Delta")
+
+    for c_idx, text in enumerate(headers, start=1):
+        cell = ws_data.cell(row=1, column=c_idx, value=text)
+        cell.font = header_font;
+        cell.fill = header_fill;
+        cell.alignment = Alignment(horizontal='center');
+        cell.border = thin_border
+
+    for r_idx, row_list in enumerate(excel_dataset_rows, start=2):
+        is_full_val = row_list[6]
+        rec_num = int(row_list[0].split('_')[1])
+
+        for c_idx, val in enumerate(row_list, start=1):
+            cell = ws_data.cell(row=r_idx, column=c_idx, value=val)
+            cell.font = regular_font;
+            cell.border = thin_border
+
+            if c_idx in [4, 7]:
+                cell.alignment = Alignment(horizontal='center')
+            elif c_idx in [5, 6]:
+                cell.alignment = Alignment(horizontal='center'); cell.number_format = '0.000'
+            elif c_idx > 7:
+                cell.alignment = Alignment(horizontal='right'); cell.number_format = '0.000'
+            else:
+                cell.alignment = Alignment(horizontal='right')
+
+            if is_full_val == 1:
+                cell.fill = full_fill
+            elif rec_num % 2 == 0:
+                cell.fill = zebra_fill
+
+    for ws in [ws_summary, ws_data]:
+        for col in ws.columns:
+            col_letter = get_column_letter(col[0].column)
+            max_len = max(len(str(cell.value or '')) for cell in col[:15])
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 11)
+
+    master_excel_file = "master_mfcc_dataset_60_balanced.xlsx"
+    wb.save(master_excel_file)
+    print(f"---> קובץ האקסל המאוחד נשמר בהצלחה: {os.path.abspath(master_excel_file)} <---")
+
+# =====================================================================
+# שלב 3: הפקת גרפי Pathfinding Tracker לכל קבוצה
+# =====================================================================
+print("\n--- מתחיל שלב יצירת הגרפים הפיזיקליים לפי קבוצות ---")
+
+for g in group_rules:
+    specs = all_group_spectrograms[g["name"]]
+    if not specs:
+        continue
+
+    print(f"-> מנתח ומשרטט גרף מעקב עבור: {g['heb_name']}")
+    max_frames = max_frames_per_group[g["name"]]
+
+    padded_specs = []
+    for S in specs:
+        pad_width = max_frames - S.shape[1]
+        if pad_width > 0:
+            S_padded = np.pad(S, ((0, 0), (0, pad_width)), mode='constant', constant_values=-100)
+            padded_specs.append(S_padded)
+        else:
+            padded_specs.append(S)
+
+    average_spectrogram = np.mean(padded_specs, axis=0)
+
+    background_noise = np.median(average_spectrogram, axis=1, keepdims=True)
+    clean_spectrogram = average_spectrogram - background_noise
+
+    mel_freqs = librosa.mel_frequencies(n_mels=average_spectrogram.shape[0], fmin=0.0, fmax=sample_rate_global / 2)
+    times = librosa.frames_to_time(np.arange(average_spectrogram.shape[1]), sr=sample_rate_global, hop_length=512)
+    max_time_seconds = librosa.frames_to_time(max_frames, sr=sample_rate_global, hop_length=512)
+
+    good_x = []
+    good_y = []
+    rejected_x = []
+    rejected_y = []
+
+    current_f = None
+    current_t = None
+    step_plot = 15
+    eval_indices = np.arange(0, average_spectrogram.shape[1], step_plot)
+
+    for col_idx in eval_indices:
+        t = times[col_idx]
+        if t < 1.5 or t > max_time_seconds:
+            continue
+
+        column = clean_spectrogram[:, col_idx]
+        global_peak_idx = np.argmax(column)
+        global_peak_hz = mel_freqs[global_peak_idx]
+
+        if current_f is None:
+            mask = (mel_freqs >= 512) & (mel_freqs <= 562)
+        else:
+            dt = t - current_t
+            max_allowed_f = current_f + 50.0 * (dt / 0.1)
+            min_allowed_f = current_f
+
+            if max_allowed_f > 2048:
+                max_allowed_f = 2048
+
+            mask = (mel_freqs >= min_allowed_f) & (mel_freqs <= max_allowed_f)
+
+        if not np.any(mask):
+            rejected_x.append(t)
+            rejected_y.append(global_peak_hz)
+            continue
+
+        subset_idx = np.where(mask)[0]
+        best_idx = subset_idx[np.argmax(column[subset_idx])]
+        f_best = mel_freqs[best_idx]
+
+        good_x.append(t)
+        good_y.append(f_best)
+
+        current_f = f_best
+        current_t = t
+
+        if mel_freqs[global_peak_idx] not in mel_freqs[subset_idx]:
+            rejected_x.append(t)
+            rejected_y.append(global_peak_hz)
+
+    smooth_x = np.linspace(1.5, max_time_seconds, 150)
+    if len(good_x) > 2:
+        coeffs = np.polyfit(good_x, good_y, 1)
+        linear_track = np.poly1d(coeffs)
+        smooth_y = linear_track(smooth_x)
+    else:
+        smooth_y = np.zeros_like(smooth_x)
+
+    plt.figure(figsize=(11, 6))
+    librosa.display.specshow(average_spectrogram, sr=sample_rate_global, hop_length=512, x_axis='time', y_axis='mel')
+
+    plt.scatter(rejected_x, rejected_y, color='red', marker='x', alpha=0.4, label='Rejected Noise (Out of Tunnel)')
+    plt.scatter(good_x, good_y, color='limegreen', edgecolor='white', s=60, zorder=10, label='Pathfinder Valid Data')
+
+    if len(good_x) > 2:
+        plt.plot(smooth_x, smooth_y, color='white', linewidth=3, zorder=9, label='Linear Track')
+
+    plt.axvline(x=max_time_seconds, color='cyan', linestyle='--', linewidth=3, zorder=5)
+    plt.text(max_time_seconds - (max_time_seconds * 0.23), 12000, f'END RECORDING (~{max_time_seconds:.1f}s)',
+             color='cyan', fontsize=12, fontweight='bold', zorder=6)
+
+    plt.colorbar(format='%+2.0f dB')
+    plt.title(f'Batch Analysis: {g["heb_name"]} ({g["type"]})', fontsize=14, fontweight='bold')
+    plt.legend(loc='upper left')
+    plt.tight_layout()
+
+    output_name = f'Tracker_{g["type"]}.png'
+    plt.savefig(output_name, dpi=300)
+    plt.close()
+    print(f"---> גרף הקבוצה נשמר בהצלחה: {os.path.abspath(output_name)}")
+
+print("\n🎉 הפרויקט המאוחד הסתיים בהצלחה! קובץ האקסל המאוזן והגרפים נוצרו.")
