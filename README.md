@@ -2,7 +2,6 @@
 
 Predicting when a cup is full based on audio recordings of the pouring process, using custom Digital Signal Processing (DSP), MFCC features, and classic Machine Learning classifiers.
 
-> **Pipeline status: ✅ COMPLETE — all scripts have been run and all outputs generated.**
 
 ---
 
