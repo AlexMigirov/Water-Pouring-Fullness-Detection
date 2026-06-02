@@ -78,6 +78,50 @@ MFCC_1_Delta … MFCC_4_Delta	Per-window mean delta (velocity) of first 4 MFCCs
 •	10,416 rows, 27 numeric features, 0 missing values
 •	Class imbalance (Task A): 97.04 % Not Full / 2.96 % Full
 •	Group K-Fold: 60 recordings → 5 folds of 12 recordings each
+## 📋 MFCC Table explanation
+MFCC_1: The Spectral Envelope (Formant Structure)
+This is usually the most important coefficient and carries the most information.
+
+Physical Meaning: It represents the broad, overall shape of the frequency spectrum. It captures the balance between low-frequency energy (bass) and high-frequency energy (treble).
+
+In our project: As the water rises, the empty space in the cup decreases. A large empty cup emphasizes lower frequencies, while a nearly full cup emphasizes higher, "tinnier" frequencies. MFCC_1 is highly sensitive to this shift in the overall balance of sound.
+
+MFCC_2: Spectral Tilt (Brightness/Sharpness)
+Physical Meaning: MFCC_2 often correlates with the "spectral tilt." It indicates whether energy is concentrated in the lower frequencies (a "dark" or muffled sound) or the higher frequencies (a "bright" or sharp sound).
+
+In our project: The sound of water hitting plastic might be duller (lower MFCC_2) compared to the sharp, crisp sound of water hitting thick glass (higher MFCC_2). It helps the model distinguish between cup materials.
+
+MFCC_3 & MFCC_4: Finer Spectral Details
+Physical Meaning: As you move to higher coefficients (3, 4, 5, etc.), they represent increasingly finer details and "ripples" in the spectral envelope. They capture the specific resonant peaks (formants) created by the physical shape of the object making the sound.
+
+In our project: These coefficients might capture the specific acoustic difference between a "tall, thin glass" and a "short, wide ceramic mug," even if both are half-full.
+
+MFCC_5 through MFCC_13: The Nuances
+Physical Meaning: These higher coefficients capture very fast, fine-grained variations in the spectrum. In human speech, they help distinguish between subtle consonant sounds.
+
+1. Standard Deviation (Std) — The "Turbulence" Feature
+Mathematical Meaning: It measures how much the MFCC values fluctuate or bounce around the average within that 300ms window.
+
+Physical Meaning: Standard Deviation represents the acoustic texture or turbulence of the sound.
+
+In Our Project: * A perfectly smooth, laminar pour into a glass will have a very stable frequency, resulting in a low Std.
+
+If the pour is splashy, bubbly, or hitting the sides of the cup erratically, the spectrum will jump around rapidly, resulting in a high Std.
+
+Why the ML model needs it: It helps the model differentiate between the chaotic splashing noise of the water hitting the bottom of an empty cup vs. the smoother, resonant hum of the cup filling up.
+
+2. Delta (Δ) — The "Velocity" Feature
+Mathematical Meaning: Delta is the first derivative (the trajectory or slope) of the MFCCs. It calculates the exact rate of change of the frequencies from one frame to the next.
+
+Physical Meaning: Delta represents the velocity of the acoustic shift. It tells us not just what the sound is, but where it is going and how fast it is getting there.
+
+In Our Project: * During the middle of the pour, the pitch rises steadily and smoothly. The Delta will be positive, but relatively small and stable.
+
+The "Fullness" Trigger: In the final 0.5 seconds of the pour, the remaining empty space in the cup vanishes rapidly, causing the pitch to hook upwards violently. At this exact moment, the Delta value will spike massively.
+
+Why the ML model needs it: Delta is arguably the most powerful feature for detecting Is_Full = 1. The ML model learns to look for this sudden, aggressive acceleration in the MFCCs to know exactly when to stop the water.
+
+In our project: While they carry less overall "weight" than the first four, they contain the subtle acoustic textures (like the difference between a smooth pour and a slightly bubbly or turbulent pour) that give Machine Learning models the extra edge to achieve 95%+ accuracy.
 ## 🧩 Cup Classes
 Class	Recording Range	Windows	Avg Duration
 Thick_Glass	1 – 15	2,239	~14.5 s
