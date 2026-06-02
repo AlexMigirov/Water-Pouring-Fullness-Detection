@@ -1,6 +1,3 @@
-Here is the seamlessly combined and formatted README.md file. It merges your existing project structure, results, and team information with the new, comprehensive summary of the architecture, DSP pipeline, and custom algorithms we built.
-You can copy this entire block and replace your current README.md on GitHub.
-Markdown
 # 🎵 Acoustic Liquid Level Detection & Cup Classification — ML Project
 
 Predicting when a cup is full based on audio recordings of the pouring process, using custom Digital Signal Processing (DSP), MFCC features, and classic Machine Learning classifiers.
