@@ -81,13 +81,13 @@ MFCC_1_Delta … MFCC_4_Delta	Per-window mean delta (velocity) of first 4 MFCCs
 •	10,416 rows, 27 numeric features, 0 missing values
 •	Class imbalance (Task A): 97.04 % Not Full / 2.96 % Full
 •	Group K-Fold: 60 recordings → 5 folds of 12 recordings each
-🧩 Cup Classes
+## 🧩 Cup Classes
 Class	Recording Range	Windows	Avg Duration
 Thick_Glass	1 – 15	2,239	~14.5 s
 Tall_Thin_Glass	16 – 30	2,815	~19.0 s
 Ceramic_Cup	31 – 45	3,657	~24.5 s
 Plastic_Cup	46 – 60	1,705	~11.5 s
-⚙️ Dependencies
+## ⚙️ Dependencies
 Bash
 pip install pandas numpy matplotlib seaborn scikit-learn openpyxl librosa av
 Package	Purpose
@@ -98,7 +98,7 @@ openpyxl	Reading .xlsx files
 librosa	Mel-spectrogram computation & DSP
 av (PyAV)	Decoding .mp4 audio streams
 Windows note: Scripts set sys.stdout.reconfigure(encoding='utf-8') automatically to handle Hebrew filenames in the console.
-🚀 How to Run
+## 🚀 How to Run
 Run the scripts in order from the project root directory:
 Step 1 — Data Exploration & Preprocessing
 Bash
@@ -113,14 +113,14 @@ python Codes/03_model_training.py
 Step 4 — Final Evaluation & Report Figures
 Bash
 python Codes/04_evaluation_and_report.py
-📊 Key Results
+## 📊 Key Results
 Fullness Detection (Is_Full, binary)
 Model	Accuracy	F1-Score	AUC-ROC	Recall
 Gradient Boosting 🥇	0.956 ± 0.010	0.417 ± 0.053	0.913 ± 0.030	0.528
 Random Forest	0.946 ± 0.009	0.350 ± 0.049	0.910 ± 0.036	0.496
 Logistic Regression	0.838 ± 0.030	0.234 ± 0.026	0.900 ± 0.035	0.828
 All results use GroupKFold (K=5) grouped by recording — preventing data leakage between time-windows of the same recording. Class imbalance was handled using class_weight='balanced' and sample weighting techniques.
-👥 Project Team
+## 👥 Project Team
 Alex Migirov, Dor Ohana, Alex Dryunkin, Yarin Navon
 SCE, Shamoon College of Engineering
 
