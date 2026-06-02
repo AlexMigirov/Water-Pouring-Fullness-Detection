@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 from pathlib import Path
 
 from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from sklearn.utils.class_weight import compute_sample_weight
 
 # ─────────────────────────────────────────────
@@ -32,7 +33,7 @@ groups = df["Group_KFold"].values
 print(f"Loaded {len(df)} samples")
 
 # ─────────────────────────────────────────────
-# MODEL (same as training)
+# MODEL
 # ─────────────────────────────────────────────
 def get_model():
     return GradientBoostingClassifier(
@@ -62,7 +63,6 @@ for train_idx, test_idx in gkf.split(X, y, groups):
 
     model = get_model()
 
-    # handle imbalance
     sample_weights = compute_sample_weight("balanced", y_tr)
 
     model.fit(X_tr, y_tr, sample_weight=sample_weights)
@@ -78,13 +78,13 @@ all_true = np.array(all_true)
 print("Collected predictions from all folds ✅")
 
 # ─────────────────────────────────────────────
-# THRESHOLD SWEEP
+# THRESHOLD SWEEP + CONFUSION MATRIX + PLOTS
 # ─────────────────────────────────────────────
 thresholds = np.arange(0.5, 0.19, -0.03)
 
 results = []
 
-for t in thresholds:
+for i, t in enumerate(thresholds):
     y_pred = (all_probs >= t).astype(int)
 
     acc  = accuracy_score(all_true, y_pred)
@@ -92,17 +92,41 @@ for t in thresholds:
     rec  = recall_score(all_true, y_pred)
     f1   = f1_score(all_true, y_pred)
 
-    results.append((t, acc, prec, rec, f1))
+    tn, fp, fn, tp = confusion_matrix(all_true, y_pred).ravel()
+
+    results.append((t, acc, prec, rec, f1, tn, fp, fn, tp))
+
+    # ✅ Plot confusion matrix כל 2 צעדים (~0.06)
+    if i % 2 == 0:
+        cm = np.array([[tn, fp],
+                       [fn, tp]])
+
+        plt.figure(figsize=(5, 4))
+        sns.heatmap(cm,
+                    annot=True,
+                    fmt="d",
+                    cmap="Blues",
+                    xticklabels=["Pred Not Full", "Pred Full"],
+                    yticklabels=["Actual Not Full", "Actual Full"])
+
+        plt.title(f"Confusion Matrix (threshold={t:.2f})")
+        plt.xlabel("Prediction")
+        plt.ylabel("Actual")
+        plt.tight_layout()
+        plt.show()
 
 # ─────────────────────────────────────────────
 # PRINT RESULTS
 # ─────────────────────────────────────────────
-print("\n=== Threshold Results ===")
-for t, acc, prec, rec, f1 in results:
+print("\n=== Threshold Results + Confusion Matrix ===")
+
+for t, acc, prec, rec, f1, tn, fp, fn, tp in results:
     print(f"t={t:.2f} | Acc={acc:.3f} | Prec={prec:.3f} | Rec={rec:.3f} | F1={f1:.3f}")
+    print(f"     TN={tn} | FP={fp} | FN={fn} | TP={tp}")
+    print()
 
 # ─────────────────────────────────────────────
-# PLOT
+# METRICS PLOT
 # ─────────────────────────────────────────────
 thresholds_plot = [r[0] for r in results]
 accuracy_list   = [r[1] for r in results]
@@ -123,5 +147,5 @@ plt.title("Threshold Sweep — Gradient Boosting")
 plt.legend()
 plt.grid(True)
 
-plt.gca().invert_xaxis()  # threshold יורד משמאל לימין
+plt.gca().invert_xaxis()
 plt.show()
