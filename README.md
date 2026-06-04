@@ -1,4 +1,4 @@
-# 🎵 Acoustic Liquid Level Detection & Cup Classification — ML Project
+# 🎵 Acoustic Liquid Level Detection — ML Project
 
 Predicting when a cup is full based on audio recordings of the pouring process, using custom Digital Signal Processing (DSP), MFCC features, and classic Machine Learning classifiers.
 
@@ -6,9 +6,7 @@ Predicting when a cup is full based on audio recordings of the pouring process, 
 ---
 
 ## 📌 Project Overview
-The goal of this project is to analyze the sound of water pouring into a cup (e.g., from a water bar) and build a dataset capable of training a Machine Learning model to:
-1. **Classify the type of cup** being filled (Glass, Ceramic, Plastic, etc.).
-2. **Detect the "Full" state** (the last 0.5 seconds of the pour) regardless of the cup's material.
+The goal of this project is to analyze the sound of water pouring into a cup (e.g., from a water bar) and build a dataset capable of training a Machine Learning model to: **Detect the "Full" state** (the last 0.5 seconds of the pour) regardless of the cup's material.
 
 To achieve this, we engineered a custom **Dynamic Pathfinding Algorithm** that traces the specific resonant "pitch hook" of the rising liquid, bypassing ambient noise and splashing artifacts, and creating a highly structured dataset for training.
 
